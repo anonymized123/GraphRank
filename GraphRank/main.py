@@ -54,18 +54,8 @@ def make_test(select):
     
     y_class = torch.load("../" + dataset_name + '/y/y_class')
     y_error = make_y_error(out, y_class)          # 分类错误的样本置1，正确的样本置0，二分类      
-    
-    T = {}
-    for i in tqdm(range(edge_index.shape[1])):
-        start = edge_index[0][i]
-        end = edge_index[1][i]
-        
-        if start not in T.keys():
-            T[start] = []
-        T[start].append((end))
-    
-    
-    # T = torch.load("/data/ylc/" + dataset_name +'/edge/T')
+
+    T = torch.load("/data/ylc/" + dataset_name +'/edge/T')    # The neighobors of node  {node_id_1:[nei_id_1, nei_id_2, ……],   node_id_2:[nei_id_1, nei_id_2, ……]}
 
     HE = process_HE(out)
     x_HE = process_HE(x_out)
