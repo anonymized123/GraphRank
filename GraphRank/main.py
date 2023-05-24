@@ -12,7 +12,7 @@ from Learn2Rank.XGboost import test_input_xgboost
 from data_process import process_HE
 
 
-def make_y_error(out, y_class, save_path):
+def make_y_error(out, y_class):
     y_error = torch.zeros(size=[y_class.shape[0]], dtype=torch.int64)
     for i in tqdm(range(y_class.shape[0])):
         if out[i].max(-1)[1].item() != y_class[i]:
@@ -23,7 +23,7 @@ def make_y_error(out, y_class, save_path):
   
 
 def make_test(select):
-    select = [0,2]
+
     datasets = ["data_ogbn-products", "data_Reddit", "data_Flickr"]
     models = ["/EnGCN", "/SIGN", "/GraphSAGE", "/ClusterGCN"]
          
@@ -33,7 +33,8 @@ def make_test(select):
     print("dataset : {}, model : {}".format(dataset_name, model_name))
     
     out = torch.load("../" + dataset_name + model_name +'/out/out')   
-
+    
+    out_mean = torch.torch.zeros_like(torch.load("../" + dataset_name + model_name +'/drop_out/out_9'))
     for i in tqdm(range(10)):      # get probabilistic output attributes
         out_mean += torch.load("../" + dataset_name + model_name +'/drop_out/out_{}'.format(i))
     out_mean /= 10
@@ -45,17 +46,14 @@ def make_test(select):
 
     x_out = torch.load("../" + dataset_name + '/data_x/x_out')     # get graph node attributes
     
-    edge_index = torch.load("../" + dataset_name + '/edge/edge_index')       # 2*n,   [[0,0,0,1,1,1,2 ], [23,24,25,152,123,152,1234 ……]]  edge(0,23)(0,24)……(2,1234)
     split_masks = torch.load("../" + dataset_name + '/split/split_masks')    
 
-    deg = torch.zeros(size=(split_masks.shape[0], 1), dtype=torch.int64)    # get graph structure attributes
-    for i in tqdm(range(edge_index.shape[1])):
-        deg[edge_index[0][i]] += 1
+    deg = torch.load("../" + dataset_name + '/deg/deg')    # get graph structure attributes
     
     y_class = torch.load("../" + dataset_name + '/y/y_class')
     y_error = make_y_error(out, y_class)          # 分类错误的样本置1，正确的样本置0，二分类      
 
-    T = torch.load("/data/ylc/" + dataset_name +'/edge/T')    # The neighobors of node  {node_id_1:[nei_id_1, nei_id_2, ……],   node_id_2:[nei_id_1, nei_id_2, ……]}
+    T = torch.load("../" + dataset_name +'/edge/T')    # The neighobors of node  {node_id_1:[nei_id_1, nei_id_2, ……],   node_id_2:[nei_id_1, nei_id_2, ……]}
 
     HE = process_HE(out)
     x_HE = process_HE(x_out)
@@ -94,7 +92,7 @@ def make_test(select):
    
 if __name__ == "__main__":
 
-    for select in [[0,0],[0,1],[0,2],[0,3], [1,0],[1,1],[1,2],[1,3], [2,0],[2,1],[2,2],[2,3]]:
+    for select in [[2,0],[2,1],[2,2],[2,3]]:
         make_test(select)
         print()
 
