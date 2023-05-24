@@ -6,8 +6,8 @@ from tqdm import tqdm
 from xgboost import XGBClassifier
 import copy 
 
-def test_input_xgboost(out, y_error, split_masks, n, train_mask, test_mask, save_path):
-    y_error = y_error.view(y_error.shape[0],1)    #torch.Size([2449029, 1])
+def test_input_xgboost(out, y_error, split_masks, n, train_mask, test_mask):
+    y_error = y_error.view(y_error.shape[0],1)   
     y_error = y_error.float()
 
     cnt_list = []
@@ -58,9 +58,6 @@ def test_input_xgboost(out, y_error, split_masks, n, train_mask, test_mask, save
         test_M[test_M_index] = 0
         
         test_failure_mask[test_M_index] = 1
-    torch.save(test_failure_mask, save_path + "/select_mask_noagg_gini")
-    torch.save(cnt_re, save_path + "/cnt_re_noagg_gini")
-    print(test_failure_mask.sum())
 
     print('xgb : test input prioritization')
     

@@ -1,6 +1,4 @@
 import numpy as np
-import os
-import struct
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -50,109 +48,104 @@ class myDataset(Dataset):
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
+dataset_list = ["data_ogbn-products", "data_Flickr", "data_Reddit"]
+
+for i_dataset in range(3):
+    dataset_name = dataset_list[i_dataset]
+
+    print("train MLP on {}".format(dataset_name))
+
+    x = torch.load("../" + dataset_name + '/data_x/x')
+    y_class = torch.load("../" + dataset_name + '/y/y_class') 
+    split_masks = torch.load("../" + dataset_name + '/split/split')
+
+    if dataset_name == "data_ogbn-products":
+        n_class = 47
+    elif dataset_name == "data_Flickr":
+        n_class = 7
+    elif dataset_name == "data_Reddit":
+        n_class = 41
+
+    batch_size = 16
 
 
-dataset_name = "data_ogbn-products"
-dataset_name = "data_Flickr"
-dataset_name = "data_Reddit"
+    x = x.to(torch.float32)
+    y_one_hot = F.one_hot(y_class, n_class)
+    y_one_hot = y_one_hot.float()
 
-x = torch.load(dataset_name + '/data_x/x')
-y_class = torch.load(dataset_name + '/y/y_class') 
-split_masks = torch.load(dataset_name + '/split/split_ori')
+    dataset_train = myDataset(x[split_masks['train']], y_one_hot[split_masks['train']])
+    dataset_valid = myDataset(x[split_masks['valid']], y_one_hot[split_masks['valid']])
+    dataset_test = myDataset(x[split_masks['test']], y_one_hot[split_masks['test']])
+    dataset_all = myDataset(x, y_one_hot)
 
-if dataset_name == "data_ogbn-products":
-    n_class = 47
-elif dataset_name == "data_Flickr":
-    n_class = 7
-elif dataset_name == "data_Reddit":
-    n_class = 41
-    # temp = split_masks['train']
-    # split_masks['train'] = split_masks['test']
-    # split_masks['valid'] = split_masks['valid']
-    # split_masks['test'] = temp
-    
-batch_size = 16
+    data_load_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True)
+    data_load_valid = DataLoader(dataset_valid, batch_size=batch_size, shuffle=True)
+    data_load_test = DataLoader(dataset_test, batch_size=batch_size, shuffle=False)
+    data_load_all = DataLoader(dataset_all, batch_size=batch_size, shuffle=False)
 
+    model = MLP(x.shape[1], y_one_hot.shape[1]) 
+    model.to(device)
 
-x = x.to(torch.float32)
-y_one_hot = F.one_hot(y_class, n_class)
-y_one_hot = y_one_hot.float()
+    loss_function = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters()) 
 
-dataset_train = myDataset(x[split_masks['train']], y_one_hot[split_masks['train']])
-dataset_valid = myDataset(x[split_masks['valid']], y_one_hot[split_masks['valid']])
-dataset_test = myDataset(x[split_masks['test']], y_one_hot[split_masks['test']])
-dataset_all = myDataset(x, y_one_hot)
+    epoch = 0
+    max_acc = 0
+    test_acc = 0
+    stop = 0
+    x_out = []
 
-data_load_train = DataLoader(dataset_train, batch_size=batch_size, shuffle=True)
-data_load_valid = DataLoader(dataset_valid, batch_size=batch_size, shuffle=True)
-data_load_test = DataLoader(dataset_test, batch_size=batch_size, shuffle=False)
-data_load_all = DataLoader(dataset_all, batch_size=batch_size, shuffle=False)
-
-model = MLP(x.shape[1], y_one_hot.shape[1]) 
-model.to(device)
-
-loss_function = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters()) 
-
-epoch = 0
-max_acc = 0
-test_acc = 0
-stop = 0
-x_out = []
-
-while(1):
-    print("开始训练: ", epoch)
-    model.train()  
-    loss = 0.0
-    for data, y in data_load_train:
-        data = data.to(device)
-        y = y.to(device)
-
-        outs = model(data)
-        
-        optimizer.zero_grad()
-        loss = loss_function(outs, y)
-        loss.backward() 
-        optimizer.step()
-    epoch += 1
-
-    if epoch % 5  == 0:
-        model.eval()
-        print("\n###########start test############\n")
-
-        cnt = 0
-        for data, y in tqdm(data_load_valid):
+    while(1):
+        print("开始训练: ", epoch)
+        model.train()  
+        loss = 0.0
+        for data, y in data_load_train:
             data = data.to(device)
             y = y.to(device)
 
             outs = model(data)
-            cnt += outs.max(-1)[1].eq(y.max(-1)[1]).sum().item()
-            acc = cnt/split_masks['valid'].sum().item()
-            # cnt += torch.ceil(outs[:, 0] - 0.5).eq(y[:, 0]).sum().item()
-        print("valid acc : {}".format(acc))
-        
-
-        if max_acc < acc:
-            max_acc = acc
-            stop = 0
             
-            x_out = []
+            optimizer.zero_grad()
+            loss = loss_function(outs, y)
+            loss.backward() 
+            optimizer.step()
+        epoch += 1
+
+        if epoch % 5  == 0:
+            model.eval()
+            print("\n###########start test############\n")
+
             cnt = 0
-            for data, y in tqdm(data_load_all):
+            for data, y in tqdm(data_load_valid):
                 data = data.to(device)
                 y = y.to(device)
+
                 outs = model(data)
-                x_out.extend(outs.tolist())
+                cnt += outs.max(-1)[1].eq(y.max(-1)[1]).sum().item()
+                acc = cnt/split_masks['valid'].sum().item()
+            print("valid acc : {}".format(acc))
+            
+
+            if max_acc < acc:
+                max_acc = acc
+                stop = 0
                 
-     
-            cnt += torch.tensor(x_out)[split_masks['test']].max(-1)[1].eq(y_one_hot[split_masks['test']].max(-1)[1]).sum().item()
-            test_acc = cnt/split_masks['test'].sum().item()
-            print("test acc : {}".format(test_acc))
-        else :
-            stop += 1
+                x_out = []
+                cnt = 0
+                for data, y in tqdm(data_load_all):
+                    data = data.to(device)
+                    y = y.to(device)
+                    outs = model(data)
+                    x_out.extend(outs.tolist())
+                    
+        
+                cnt += torch.tensor(x_out)[split_masks['test']].max(-1)[1].eq(y_one_hot[split_masks['test']].max(-1)[1]).sum().item()
+                test_acc = cnt/split_masks['test'].sum().item()
+                print("test acc : {}".format(test_acc))
+            else :
+                stop += 1
 
-        if stop > 5:
-            break
+            if stop > 5:
+                break
 
-torch.save(torch.tensor(x_out, dtype=torch.float32), dataset_name + '/data_x/x_out')
-print(max_acc, test_acc)
+    torch.save(torch.tensor(x_out, dtype=torch.float32), "../" + dataset_name + '/data_x/x_out')
