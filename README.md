@@ -5,4 +5,4 @@ Train GNN model can refer to "https://github.com/VITA-Group/Large_Scale_GCN_Benc
 
 The output of 3 datasets is in the corresponding "data_" folder
 
-run "python main.py" 
+Enter the "GraphRank" folder and run "python main.py" 
