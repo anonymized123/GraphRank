@@ -8,5 +8,5 @@ conda create -n GraphRank python=3.8
 conda activate GraphRank
 pip install -r requirement.txt
 ```
-
+python main.py
 ```
